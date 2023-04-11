@@ -35,8 +35,8 @@ from hypothesis import given, strategies as st
   
 from django.urls import URLPattern, URLResolver  
   
-from rerotor2.urls import urlpatterns  
-from rerotor2.models import Business, User  
+from project.urls import urlpatterns  
+from project.models import Business, User  
 import atheris  
   
 IGNORE_APPS = ["rest_framework"]  
