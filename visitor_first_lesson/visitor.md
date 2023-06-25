@@ -1,32 +1,3 @@
-```
-class Visitor:
-
-    def visit(self, object):
-        raise NotImplementedError
-
-
-class makeRoarVisitor(Visitor):
-
-    def visit(self, object):
-        print(f"{object} and I make RRR")
-
-class Animal:
-
-    def accept(self, visitor):
-        visitor.visit(self)
-
-    def __str__(self):
-        return f"I'm a {self.__class__.__name__}"
-
-class Cat(Animal):
-    pass
-
-
-class Dog(Animal):
-    pass
-
-```
-
 # Описание паттерна
 
 Паттерн Visitor позволяет при наличии метода accept() в ветке классов гибко их модифицировать без необходимости переписывания
