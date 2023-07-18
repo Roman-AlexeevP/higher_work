@@ -158,6 +158,112 @@ class Order:
 
 ## 1.4. Странные решения.
 
-### 
+### 1
+
+Есть класс-контроллер для апи и отдельный свой класс для конкретной валидации содержимого входящего файла
+
+Грубо говоря схема такая:
+
+```python
+
+class MyViewSet:
+
+    def post(self, request):
+        data = request.data
+        cleaned_data = self.validate(data)
+        do_something_with_data()
+    
+    def validate(self, data):
+        if data.end_data < today_data:
+            raise ValidationError()
+        file_validator = COntentFileValidator(data.file)
+        # some additional checks
+        return data
+```
+
+Суть в том, что есть валидация как отдельный класс для файла, но также есть валидация для данных прямо в контроллере, 
+то есть и там и там. Думаю совершенно точно имеет смысл передавать основной массив данных из запроса в Serializer, 
+где реализованы базовые проверки основных типов данных, а для класс валидации файла добавить метод __call__(), чтобы можно
+было передать как дополнительный валидатор в основной класс Serializer.
+
+```python
+
+class ContentFileValidator():
+    
+    def validate(self, *args, **kwargs):
+        # do some specific checks
+        return True
+ 
+    def __call__(self, *args, **kwargs):
+        self.validate(*args, **kwargs)
+
+class ContentSerializer(Serializer):
+ 
+    end_date = serializers.DateTImeFiled()
+    file = serializer.FileField(validators=[ContentFileValidator,])
+    # ... another fields
+    
+class MyViewSet():
+ 
+    def post(self, request):
+        serializer = ContentSerializer(request.data)
+        serializer.validate(raise_exception=True)
+        do_something(serializer.cleaned_data)
+```
+
+В таком случае хоть и рамках архитектуры джанго, но мы разделили функционал на 3 разных уровня, где контроллер отвечает
+только за доставку и прием данных, основной сериализатор за формат данных и базовую валидацию, а специфичные для определенных типов
+данных класс отдельно передаются как Callable
 
 ## 1.5. Чрезмерный результат. Метод возвращает больше данных, чем нужно вызывающему его компоненту. 
+
+Недавний пример с такой проблемой был в моделях FastAPI и самих endpoint функциях:
+
+```python
+
+class MyModel:
+ 
+    field1: int
+    field2: str
+    field3: str
+    field4: str
+    # more additional fields
+    
+@router.post("process_entity", model_class=MyModel)
+def procces_entity(data: MyModel):
+ 
+    processed_entity_with_one_field = service.process(data)
+    return processed_entity_with_one_field
+
+
+```
+
+В других эндпоинтах сущность могла использоваться целиком со всеми указанными полями.
+В данном обработка происходила по всем полям, но результат был необходим лишь с одного поля. 
+Поэтому после спокойного изучения документации, была создана модель отдельно для ответа с конкретным полем.
+
+```python
+
+class MyModelOut:
+
+    important_field: str
+
+@router.post("process_entity", model_class=MyModel, response_model=MyModelOut)
+def procces_entity(data: MyModel) -> MyModelOut:
+ 
+    processed_entity_with_one_field = service.process(data)
+    return processed_entity_with_one_field
+
+```
+
+
+### Выводы
+
+В большинстве проблемы связанные рефакторингом часто решаются вдумчивым созданием дополнительных абстракций и сущностей,
+ которые обычно кажутся излишними и избыточными. И знание паттернов не так обязательно, как скорее важно понимать домен
+ сущностей и за что каждая отвечает, чтобы корректно использовать их друг другом.
+Но последний пункт хоть и являеется примером плохого стиля может помочь при расширении функционала и более гибко работать принимающей стороне.
+Например, избыточный ответ АПИ для фронтенда зачастую удобен, если не содержит каких-либо чувствительных к безопасности данных.
+
+И в который раз данные примеры показывают, что проще знать как не надо писать код, чтобы быстрее заметить проблемы в своем проекте 
+на очередном круге разработки/рефакторинга.
